@@ -18,7 +18,13 @@ export function useCodeReview() {
         body: JSON.stringify(request),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data: { error?: string; review?: string; model?: string };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Server error (${response.status}): ${text.slice(0, 300) || "empty response"}`);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to get review");
