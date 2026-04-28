@@ -12,4 +12,16 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom"],
+          markdown: ["react-markdown"],
+          highlighter: ["react-syntax-highlighter"],
+          icons: ["lucide-react"],
+        },
+      },
+    },
+  },
 });
