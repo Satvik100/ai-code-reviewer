@@ -15,7 +15,8 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.use("/api/review", reviewRouter);
+app.use("/api/review", reviewRouter); // local dev
+app.use("/review", reviewRouter);     // Vercel strips /api prefix
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
