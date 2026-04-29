@@ -7,6 +7,7 @@ import { Bot, Copy } from "lucide-react";
 
 interface Props {
   result: ReviewResult;
+  isStreaming?: boolean;
 }
 
 const markdownComponents: Components = {
@@ -68,7 +69,7 @@ const markdownComponents: Components = {
   hr: () => <hr className="border-gray-700 my-4" />,
 };
 
-export function ReviewDisplay({ result }: Props) {
+export function ReviewDisplay({ result, isStreaming = false }: Props) {
   async function copyReview() {
     await navigator.clipboard.writeText(result.review);
   }
@@ -79,16 +80,25 @@ export function ReviewDisplay({ result }: Props) {
         <div className="flex items-center gap-2">
           <Bot size={16} className="text-blue-400" />
           <span className="text-sm font-medium text-gray-200">AI Review</span>
-          <span className="text-xs text-gray-500 font-mono">{result.model}</span>
+          {isStreaming ? (
+            <span className="flex items-center gap-1.5 text-xs text-blue-400">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              Streaming
+            </span>
+          ) : (
+            <span className="text-xs text-gray-500 font-mono">{result.model}</span>
+          )}
         </div>
-        <button
-          onClick={copyReview}
-          title="Copy review"
-          className="text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1 text-xs"
-        >
-          <Copy size={13} />
-          Copy
-        </button>
+        {!isStreaming && (
+          <button
+            onClick={copyReview}
+            title="Copy review"
+            className="text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1 text-xs"
+          >
+            <Copy size={13} />
+            Copy
+          </button>
+        )}
       </div>
       <div className="p-6 prose prose-invert max-w-none overflow-auto">
         <ReactMarkdown components={markdownComponents}>

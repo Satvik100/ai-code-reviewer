@@ -4,37 +4,78 @@ import type { ReviewResult, ReviewRequest, ReviewStatus } from "../types";
 export function useCodeReview() {
   const [status, setStatus] = useState<ReviewStatus>("idle");
   const [result, setResult] = useState<ReviewResult | null>(null);
+  const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function submitReview(request: ReviewRequest) {
     setStatus("loading");
     setError(null);
     setResult(null);
+    setStreamingText("");
 
     try {
-      const response = await fetch("/api/review", {
+      const response = await fetch("/api/review/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),
       });
 
-      const text = await response.text();
-      let data: { error?: string; review?: string; model?: string };
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error(`Server error (${response.status}): ${text.slice(0, 300) || "empty response"}`);
-      }
-
       if (!response.ok) {
-        throw new Error(data.error || "Failed to get review");
+        const data = await response.json() as { error?: string };
+        throw new Error(data.error ?? "Failed to get review");
       }
 
-      setResult(data as ReviewResult);
+      if (!response.body) throw new Error("No response body");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+      let model = "llama-3.3-70b-versatile";
+
+      setStatus("streaming");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+
+        for (const event of events) {
+          const dataLine = event.split("\n").find((l) => l.startsWith("data: "));
+          if (!dataLine) continue;
+          const jsonStr = dataLine.slice(6).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const parsed = JSON.parse(jsonStr) as {
+              chunk?: string;
+              done?: boolean;
+              model?: string;
+              error?: string;
+            };
+
+            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.chunk) {
+              accumulated += parsed.chunk;
+              setStreamingText(accumulated);
+            }
+            if (parsed.model) model = parsed.model;
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message !== jsonStr) {
+              throw parseErr;
+            }
+          }
+        }
+      }
+
+      setResult({ review: accumulated, model });
+      setStreamingText("");
       setStatus("success");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "An unexpected error occurred";
-      setError(message);
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
       setStatus("error");
     }
   }
@@ -42,8 +83,9 @@ export function useCodeReview() {
   function reset() {
     setStatus("idle");
     setResult(null);
+    setStreamingText("");
     setError(null);
   }
 
-  return { status, result, error, submitReview, reset };
+  return { status, result, streamingText, error, submitReview, reset };
 }

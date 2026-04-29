@@ -1,120 +1,149 @@
-import { useState } from "react";
-import { Code2, Loader2, AlertCircle, Sparkles } from "lucide-react";
-import { CodeEditor } from "./components/CodeEditor";
-import { LanguageSelector } from "./components/LanguageSelector";
-import { FocusAreaSelector } from "./components/FocusAreaSelector";
-import { ReviewDisplay } from "./components/ReviewDisplay";
-import { useCodeReview } from "./hooks/useCodeReview";
+import { useState, useEffect } from "react";
+import { Code2, GitPullRequest, Clock, Bot } from "lucide-react";
+import { CodeReviewPanel } from "./components/CodeReviewPanel";
+import { PRReviewPanel } from "./components/PRReviewPanel";
+import { HistoryPanel } from "./components/HistoryPanel";
+import { BotSetupPanel } from "./components/BotSetupPanel";
+import {
+  getHistory,
+  addToHistory,
+  removeFromHistory,
+  clearHistory,
+} from "./utils/storage";
+import type {
+  HistoryEntry,
+  ReviewResult,
+  PRMetadata,
+  PRReviewResult,
+} from "./types";
+
+type Tab = "code" | "pr" | "history" | "bot";
 
 export default function App() {
-  const [code, setCode] = useState("");
-  const [language, setLanguage] = useState("javascript");
-  const [focusAreas, setFocusAreas] = useState<string[]>([]);
-  const { status, result, error, submitReview, reset } = useCodeReview();
+  const [activeTab, setActiveTab] = useState<Tab>("code");
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (code.trim()) {
-      submitReview({ code, language, focusAreas });
-    }
+  useEffect(() => {
+    setHistory(getHistory());
+  }, []);
+
+  function handleCodeSuccess(
+    code: string,
+    language: string,
+    result: ReviewResult
+  ) {
+    const entry = addToHistory({
+      type: "code",
+      title: `${language.charAt(0).toUpperCase() + language.slice(1)} review`,
+      codeData: { code, language, result },
+    });
+    setHistory((prev) => [entry, ...prev]);
   }
 
-  function handleReset() {
-    setCode("");
-    setFocusAreas([]);
-    reset();
+  function handlePRSuccess(
+    prUrl: string,
+    metadata: PRMetadata,
+    result: PRReviewResult
+  ) {
+    const title = `PR #${metadata.number}: ${
+      metadata.title.length > 50
+        ? metadata.title.slice(0, 50) + "…"
+        : metadata.title
+    }`;
+    const entry = addToHistory({
+      type: "pr",
+      title,
+      prData: { prUrl, metadata, result },
+    });
+    setHistory((prev) => [entry, ...prev]);
   }
 
-  const isLoading = status === "loading";
+  function handleDeleteHistory(id: string) {
+    removeFromHistory(id);
+    setHistory((prev) => prev.filter((e) => e.id !== id));
+  }
+
+  function handleClearHistory() {
+    clearHistory();
+    setHistory([]);
+  }
+
+  const tabs: {
+    id: Tab;
+    label: string;
+    Icon: React.ElementType;
+    badge?: number;
+  }[] = [
+    { id: "code", label: "Code Review", Icon: Code2 },
+    { id: "pr", label: "PR Review", Icon: GitPullRequest },
+    {
+      id: "history",
+      label: "History",
+      Icon: Clock,
+      badge: history.length > 0 ? history.length : undefined,
+    },
+    { id: "bot", label: "GitHub Bot", Icon: Bot },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      <header className="border-b border-gray-800 bg-gray-900">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="bg-blue-600 p-1.5 rounded-lg">
-            <Code2 size={20} className="text-white" />
+      <header className="border-b border-gray-800 bg-gray-900 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4">
+          {/* Logo row */}
+          <div className="flex items-center gap-3 pt-4 pb-3">
+            <div className="bg-blue-600 p-1.5 rounded-lg">
+              <Code2 size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white leading-none">
+                AI Code Reviewer
+              </h1>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Powered by Groq + Llama 3.3 70B
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-white">AI Code Reviewer</h1>
-            <p className="text-xs text-gray-400">Powered by Groq</p>
+
+          {/* Tab bar */}
+          <div className="flex gap-1">
+            {tabs.map(({ id, label, Icon, badge }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+                  activeTab === id
+                    ? "border-blue-500 text-white bg-gray-950"
+                    : "border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/40"
+                }`}
+              >
+                <Icon size={15} />
+                {label}
+                {badge !== undefined && (
+                  <span className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full min-w-[20px] text-center leading-none">
+                    {badge}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-white">Submit Code</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Paste your code to get an AI-powered review</p>
-              </div>
-              <LanguageSelector value={language} onChange={setLanguage} />
-            </div>
-
-            <CodeEditor code={code} language={language} onChange={setCode} />
-
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                Focus Areas (optional)
-              </label>
-              <FocusAreaSelector selected={focusAreas} onChange={setFocusAreas} />
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={isLoading || !code.trim()}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Reviewing...
-                </>
-              ) : (
-                <>
-                  <Sparkles size={16} />
-                  Review Code
-                </>
-              )}
-            </button>
-
-            {(status !== "idle" || code) && (
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={isLoading}
-                className="px-5 py-2.5 rounded-lg font-medium text-sm border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </form>
-
-        {status === "error" && error && (
-          <div className="flex items-start gap-3 bg-red-950 border border-red-800 rounded-xl p-4 text-red-300">
-            <AlertCircle size={18} className="mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium text-sm">Review failed</p>
-              <p className="text-sm mt-0.5 opacity-80">{error}</p>
-            </div>
-          </div>
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        {activeTab === "code" && (
+          <CodeReviewPanel onSuccess={handleCodeSuccess} />
         )}
-
-        {status === "loading" && (
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-12 flex flex-col items-center gap-4 text-gray-400">
-            <Loader2 size={32} className="animate-spin text-blue-500" />
-            <div className="text-center">
-              <p className="font-medium">Analyzing your code...</p>
-              <p className="text-sm mt-1 text-gray-500">This may take a few seconds</p>
-            </div>
-          </div>
+        {activeTab === "pr" && (
+          <PRReviewPanel onSuccess={handlePRSuccess} />
         )}
-
-        {status === "success" && result && <ReviewDisplay result={result} />}
+        {activeTab === "history" && (
+          <HistoryPanel
+            history={history}
+            onDelete={handleDeleteHistory}
+            onClearAll={handleClearHistory}
+          />
+        )}
+        {activeTab === "bot" && <BotSetupPanel />}
       </main>
     </div>
   );
