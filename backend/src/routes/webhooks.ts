@@ -33,7 +33,13 @@ router.post("/github", async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  if (!verifyWebhookSignature(req.body as Buffer, signature, secret)) {
+  const rawBody = (req as any).rawBody as Buffer | undefined;
+  if (!rawBody) {
+    res.status(400).json({ error: "Missing request body" });
+    return;
+  }
+
+  if (!verifyWebhookSignature(rawBody, signature, secret)) {
     res.status(401).json({ error: "Invalid webhook signature" });
     return;
   }
@@ -43,15 +49,8 @@ router.post("/github", async (req: Request, res: Response): Promise<void> => {
 
   if (event !== "pull_request") return;
 
-  let payload: Record<string, any>;
-  try {
-    payload = JSON.parse((req.body as Buffer).toString());
-  } catch {
-    console.error("[webhook] Failed to parse payload");
-    return;
-  }
-
-  const { action, installation, repository, pull_request } = payload;
+  // req.body is already parsed JSON by express.json()
+  const { action, installation, repository, pull_request } = req.body as Record<string, any>;
 
   if (!["opened", "synchronize", "reopened"].includes(action as string)) return;
 

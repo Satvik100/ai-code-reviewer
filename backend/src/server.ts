@@ -10,25 +10,23 @@ const app = express();
 
 app.use(cors());
 
-// Webhook routes need raw body for HMAC signature verification —
-// must be registered before express.json() parses the body.
+// Capture raw body via verify callback so webhook HMAC verification always
+// has the original bytes — compatible with both local dev and Vercel.
 app.use(
-  "/api/webhooks",
-  express.raw({ type: "application/json" }),
-  webhookRouter
+  express.json({
+    limit: "1mb",
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
 );
-app.use(
-  "/webhooks",
-  express.raw({ type: "application/json" }),
-  webhookRouter
-);
-
-app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.use("/api/webhooks", webhookRouter);
+app.use("/webhooks", webhookRouter);
 app.use("/api/review", reviewRouter);
 app.use("/review", reviewRouter);
 
