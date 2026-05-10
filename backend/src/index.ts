@@ -18,6 +18,11 @@ app.use(
   express.raw({ type: "application/json" }),
   webhookRouter
 );
+app.use(
+  "/webhooks",
+  express.raw({ type: "application/json" }),
+  webhookRouter
+);
 
 app.use(express.json({ limit: "1mb" }));
 
