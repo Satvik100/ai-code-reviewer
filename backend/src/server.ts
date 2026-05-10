@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import reviewRouter from "./routes/review";
 import webhookRouter from "./routes/webhooks";
+import historyRouter from "./routes/history";
 
 dotenv.config();
 
@@ -29,5 +30,7 @@ app.use("/api/webhooks", webhookRouter);
 app.use("/webhooks", webhookRouter);
 app.use("/api/review", reviewRouter);
 app.use("/review", reviewRouter);
+app.use("/api/history", historyRouter);
+app.use("/history", historyRouter);
 
 export default app;

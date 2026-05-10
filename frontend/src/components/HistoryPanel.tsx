@@ -1,12 +1,16 @@
 import {
   Clock,
+  Cloud,
   Code2,
   GitPullRequest,
+  HardDrive,
   Trash2,
   ShieldAlert,
   AlertTriangle,
   Lightbulb,
+  LogIn,
 } from "lucide-react";
+import { SignInButton } from "@clerk/clerk-react";
 import type { HistoryEntry } from "../types";
 
 function timeAgo(timestamp: number): string {
@@ -22,19 +26,30 @@ function timeAgo(timestamp: number): string {
 
 interface Props {
   history: HistoryEntry[];
+  isCloud: boolean;
   onDelete: (id: string) => void;
   onClearAll: () => void;
 }
 
-export function HistoryPanel({ history, onDelete, onClearAll }: Props) {
+export function HistoryPanel({ history, isCloud, onDelete, onClearAll }: Props) {
   if (history.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-gray-500">
-        <Clock size={36} className="mb-3 opacity-20" />
-        <p className="text-sm font-medium">No review history yet</p>
-        <p className="text-xs mt-1 text-gray-600">
-          Reviews you run will appear here
-        </p>
+      <div className="flex flex-col items-center justify-center py-24 text-gray-500 gap-4">
+        <Clock size={36} className="opacity-20" />
+        <div className="text-center">
+          <p className="text-sm font-medium">No review history yet</p>
+          <p className="text-xs mt-1 text-gray-600">
+            Reviews you run will appear here
+          </p>
+        </div>
+        {!isCloud && (
+          <SignInButton mode="modal">
+            <button className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 border border-blue-900 hover:border-blue-700 px-3 py-1.5 rounded-lg transition-colors">
+              <LogIn size={13} />
+              Sign in to sync history across devices
+            </button>
+          </SignInButton>
+        )}
       </div>
     );
   }
@@ -42,9 +57,22 @@ export function HistoryPanel({ history, onDelete, onClearAll }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-400">
-          {history.length} review{history.length !== 1 ? "s" : ""}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-gray-400">
+            {history.length} review{history.length !== 1 ? "s" : ""}
+          </p>
+          {isCloud ? (
+            <span className="flex items-center gap-1 text-xs text-green-500">
+              <Cloud size={11} /> synced
+            </span>
+          ) : (
+            <SignInButton mode="modal">
+              <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-400 transition-colors">
+                <HardDrive size={11} /> local only — sign in to sync
+              </button>
+            </SignInButton>
+          )}
+        </div>
         <button
           onClick={onClearAll}
           className="text-xs text-red-400 hover:text-red-300 transition-colors"

@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { Code2, GitPullRequest, Clock, Bot } from "lucide-react";
+import {
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  UserButton,
+  useUser,
+} from "@clerk/clerk-react";
+import { Code2, GitPullRequest, Clock, Bot, LogIn } from "lucide-react";
 import { CodeReviewPanel } from "./components/CodeReviewPanel";
 import { PRReviewPanel } from "./components/PRReviewPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
@@ -10,6 +17,12 @@ import {
   removeFromHistory,
   clearHistory,
 } from "./utils/storage";
+import {
+  saveCloudReview,
+  getCloudHistory,
+  deleteCloudReview,
+  clearCloudHistory,
+} from "./utils/cloudStorage";
 import type {
   HistoryEntry,
   ReviewResult,
@@ -20,27 +33,50 @@ import type {
 type Tab = "code" | "pr" | "history" | "bot";
 
 export default function App() {
+  const { user, isSignedIn } = useUser();
   const [activeTab, setActiveTab] = useState<Tab>("code");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
+  // Load history — cloud when signed in, localStorage when not
   useEffect(() => {
-    setHistory(getHistory());
-  }, []);
+    if (isSignedIn && user) {
+      getCloudHistory(user.id).then((entries) => {
+        setHistory(entries.length > 0 ? entries : getHistory());
+      });
+    } else {
+      setHistory(getHistory());
+    }
+  }, [isSignedIn, user]);
 
-  function handleCodeSuccess(
+  async function handleCodeSuccess(
     code: string,
     language: string,
     result: ReviewResult
   ) {
-    const entry = addToHistory({
-      type: "code",
+    const entryBase = {
+      type: "code" as const,
       title: `${language.charAt(0).toUpperCase() + language.slice(1)} review`,
       codeData: { code, language, result },
-    });
+    };
+
+    if (isSignedIn && user) {
+      const cloudId = await saveCloudReview(user.id, entryBase);
+      if (cloudId) {
+        const cloudEntry: HistoryEntry = {
+          ...entryBase,
+          id: cloudId,
+          timestamp: Date.now(),
+        };
+        setHistory((prev) => [cloudEntry, ...prev]);
+        return;
+      }
+    }
+    // Fallback to localStorage
+    const entry = addToHistory(entryBase);
     setHistory((prev) => [entry, ...prev]);
   }
 
-  function handlePRSuccess(
+  async function handlePRSuccess(
     prUrl: string,
     metadata: PRMetadata,
     result: PRReviewResult
@@ -50,30 +86,47 @@ export default function App() {
         ? metadata.title.slice(0, 50) + "…"
         : metadata.title
     }`;
-    const entry = addToHistory({
-      type: "pr",
+    const entryBase = {
+      type: "pr" as const,
       title,
       prData: { prUrl, metadata, result },
-    });
+    };
+
+    if (isSignedIn && user) {
+      const cloudId = await saveCloudReview(user.id, entryBase);
+      if (cloudId) {
+        const cloudEntry: HistoryEntry = {
+          ...entryBase,
+          id: cloudId,
+          timestamp: Date.now(),
+        };
+        setHistory((prev) => [cloudEntry, ...prev]);
+        return;
+      }
+    }
+    const entry = addToHistory(entryBase);
     setHistory((prev) => [entry, ...prev]);
   }
 
-  function handleDeleteHistory(id: string) {
-    removeFromHistory(id);
+  async function handleDeleteHistory(id: string) {
+    if (isSignedIn && user) {
+      await deleteCloudReview(user.id, id);
+    } else {
+      removeFromHistory(id);
+    }
     setHistory((prev) => prev.filter((e) => e.id !== id));
   }
 
-  function handleClearHistory() {
-    clearHistory();
+  async function handleClearHistory() {
+    if (isSignedIn && user) {
+      await clearCloudHistory(user.id);
+    } else {
+      clearHistory();
+    }
     setHistory([]);
   }
 
-  const tabs: {
-    id: Tab;
-    label: string;
-    Icon: React.ElementType;
-    badge?: number;
-  }[] = [
+  const tabs: { id: Tab; label: string; Icon: React.ElementType; badge?: number }[] = [
     { id: "code", label: "Code Review", Icon: Code2 },
     { id: "pr", label: "PR Review", Icon: GitPullRequest },
     {
@@ -90,18 +143,39 @@ export default function App() {
       <header className="border-b border-gray-800 bg-gray-900 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4">
           {/* Logo row */}
-          <div className="flex items-center gap-3 pt-4 pb-3">
-            <div className="bg-blue-600 p-1.5 rounded-lg">
-              <Code2 size={20} className="text-white" />
+          <div className="flex items-center justify-between pt-4 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-600 p-1.5 rounded-lg">
+                <Code2 size={20} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-white leading-none">
+                  AI Code Reviewer
+                </h1>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Powered by Groq + Llama 3.3 70B
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-white leading-none">
-                AI Code Reviewer
-              </h1>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Powered by Groq + Llama 3.3 70B
-              </p>
-            </div>
+
+            {/* Auth */}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 px-3 py-1.5 rounded-lg transition-colors">
+                  <LogIn size={15} />
+                  Sign in
+                </button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: "w-8 h-8",
+                  },
+                }}
+              />
+            </SignedIn>
           </div>
 
           {/* Tab bar */}
@@ -139,6 +213,7 @@ export default function App() {
         {activeTab === "history" && (
           <HistoryPanel
             history={history}
+            isCloud={!!(isSignedIn && user)}
             onDelete={handleDeleteHistory}
             onClearAll={handleClearHistory}
           />
