@@ -44,15 +44,17 @@ router.post("/github", async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  // Respond immediately — GitHub marks deliveries as failed after 10s
-  res.status(200).json({ ok: true });
+  if (event !== "pull_request") {
+    res.status(200).json({ ok: true, skipped: true });
+    return;
+  }
 
-  if (event !== "pull_request") return;
-
-  // req.body is already parsed JSON by express.json()
   const { action, installation, repository, pull_request } = req.body as Record<string, any>;
 
-  if (!["opened", "synchronize", "reopened"].includes(action as string)) return;
+  if (!["opened", "synchronize", "reopened"].includes(action as string)) {
+    res.status(200).json({ ok: true, skipped: true });
+    return;
+  }
 
   const fullName = repository?.full_name as string;
   const [owner, repo] = fullName?.split("/") ?? [];
@@ -61,15 +63,27 @@ router.post("/github", async (req: Request, res: Response): Promise<void> => {
 
   if (!owner || !repo || !prNumber || !installationId) {
     console.error("[webhook] Missing required fields in payload");
+    res.status(400).json({ error: "Missing required fields" });
     return;
   }
 
-  processReview(owner, repo, prNumber, installationId).catch((err) =>
-    console.error(`[webhook] Review failed for ${owner}/${repo}#${prNumber}:`, err)
-  );
+  // Send 200 status + initial chunk immediately so GitHub marks delivery as
+  // successful. Deliberately do NOT call res.end() yet — Vercel only freezes
+  // the function process after res.end(), so keeping the connection open lets
+  // us await the full review without being killed.
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.write(JSON.stringify({ ok: true }));
+
+  try {
+    await processReview(owner, repo, prNumber, installationId);
+  } catch (err) {
+    console.error(`[webhook] Review failed for ${owner}/${repo}#${prNumber}:`, err);
+  }
+
+  res.end();
 });
 
-// ─── Background Review ────────────────────────────────────────────────────────
+// ─── Review Processor ────────────────────────────────────────────────────────
 
 async function processReview(
   owner: string,
