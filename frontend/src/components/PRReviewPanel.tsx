@@ -108,6 +108,7 @@ export function PRReviewPanel({ onSuccess }: Props) {
   }
 
   const isLoading = status === "loading";
+  const isValidUrl = /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(prUrl.trim());
 
   return (
     <div className="space-y-6">
@@ -136,8 +137,13 @@ export function PRReviewPanel({ onSuccess }: Props) {
                 onChange={(e) => setPrUrl(e.target.value)}
                 placeholder="https://github.com/owner/repo/pull/123"
                 disabled={isLoading}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className={`w-full bg-gray-800 border rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none disabled:opacity-50 ${
+                  prUrl && !isValidUrl ? "border-red-600 focus:border-red-500" : "border-gray-700 focus:border-blue-500"
+                }`}
               />
+              {prUrl && !isValidUrl && (
+                <p className="text-xs text-red-400 mt-1">Enter a valid GitHub PR URL: github.com/owner/repo/pull/123</p>
+              )}
             </div>
           </div>
 
@@ -170,7 +176,7 @@ export function PRReviewPanel({ onSuccess }: Props) {
         <div className="flex gap-3">
           <button
             type="submit"
-            disabled={isLoading || !prUrl.trim()}
+            disabled={isLoading || !isValidUrl}
             className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
           >
             {isLoading ? (
