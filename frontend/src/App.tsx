@@ -33,7 +33,14 @@ interface Props {
 }
 
 export default function App({ authSlot, signInSlot, userId = null, isSignedIn = false }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>("code");
+  const [activeTab, setActiveTab] = useState<Tab>(
+    () => (localStorage.getItem("activeTab") as Tab) ?? "code"
+  );
+
+  function handleTabChange(tab: Tab) {
+    setActiveTab(tab);
+    localStorage.setItem("activeTab", tab);
+  }
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
@@ -156,7 +163,7 @@ export default function App({ authSlot, signInSlot, userId = null, isSignedIn = 
             {tabs.map(({ id, label, Icon, badge }) => (
               <button
                 key={id}
-                onClick={() => setActiveTab(id)}
+                onClick={() => handleTabChange(id)}
                 className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
                   activeTab === id
                     ? "border-blue-500 text-white bg-gray-950"
