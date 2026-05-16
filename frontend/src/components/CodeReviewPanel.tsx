@@ -30,6 +30,12 @@ export function CodeReviewPanel({ onSuccess }: Props) {
     }
   }
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && code.trim() && !isBusy) {
+      submitReview({ code, language, focusAreas });
+    }
+  }
+
   function handleReset() {
     setCode("");
     setFocusAreas([]);
@@ -40,7 +46,7 @@ export function CodeReviewPanel({ onSuccess }: Props) {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
@@ -82,6 +88,7 @@ export function CodeReviewPanel({ onSuccess }: Props) {
               <>
                 <Sparkles size={16} />
                 Review Code
+                <span className="text-xs opacity-50 ml-1">⌘↵</span>
               </>
             )}
           </button>
