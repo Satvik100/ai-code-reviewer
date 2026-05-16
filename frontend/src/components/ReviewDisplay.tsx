@@ -3,7 +3,8 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { Components } from "react-markdown";
 import type { ReviewResult } from "../types";
-import { Bot, Copy } from "lucide-react";
+import { Bot, Copy, Check } from "lucide-react";
+import { useState } from "react";
 
 interface Props {
   result: ReviewResult;
@@ -70,8 +71,12 @@ const markdownComponents: Components = {
 };
 
 export function ReviewDisplay({ result, isStreaming = false }: Props) {
+  const [copied, setCopied] = useState(false);
+
   async function copyReview() {
     await navigator.clipboard.writeText(result.review);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -95,8 +100,7 @@ export function ReviewDisplay({ result, isStreaming = false }: Props) {
             title="Copy review"
             className="text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1 text-xs"
           >
-            <Copy size={13} />
-            Copy
+            {copied ? <><Check size={13} className="text-green-400" /><span className="text-green-400">Copied!</span></> : <><Copy size={13} />Copy</>}
           </button>
         )}
       </div>
