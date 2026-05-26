@@ -2,7 +2,7 @@
 
 An AI-powered code review tool that analyzes code and pull requests, posts automated review comments via a GitHub App bot, and syncs history across devices — built with Groq, React, Clerk, and Supabase.
 
-**Live demo:** https://ai-code-reviewer-psi-sooty.vercel.app
+**Live demo:** https://ai-code-reviewer-satvik.vercel.app
 
 ---
 
@@ -19,6 +19,12 @@ Install the GitHub App on any repository and it automatically posts AI review co
 
 ### Cloud History
 Sign in with Google or GitHub (via Clerk) to sync your review history across devices. Anonymous users fall back to localStorage automatically.
+
+### Load from History
+Click any entry in the History tab to instantly reload that review — switches to the correct tab and restores the full result.
+
+### Share Links
+Click the Share button on any completed review to copy a shareable URL. Anyone who opens the link sees the same review, no account needed.
 
 ---
 
@@ -40,9 +46,11 @@ Sign in with Google or GitHub (via Clerk) to sync your review history across dev
 
 ```
 Browser
-  ├── Code/PR review  →  POST /api/review  →  Groq (Llama 3.3 70B)
-  ├── History (auth)  →  GET/POST /api/history  →  Supabase
-  └── History (anon)  →  localStorage
+  ├── Code/PR review   →  POST /api/review          →  Groq (Llama 3.3 70B)
+  ├── History (auth)   →  GET/POST /api/history      →  Supabase
+  ├── History (anon)   →  localStorage
+  └── Share link       →  POST /api/history/share    →  Supabase (public row)
+       └── ?share=id   →  GET  /api/history/share/id →  fetch & display
 
 GitHub
   └── PR opened/updated  →  POST /webhooks/github  →  GitHub App bot
