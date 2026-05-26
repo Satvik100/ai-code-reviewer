@@ -74,3 +74,49 @@ export async function clearCloudHistory(userId: string): Promise<void> {
     // best-effort
   }
 }
+
+export async function shareReview(
+  entry: Omit<HistoryEntry, "id" | "timestamp">
+): Promise<string | null> {
+  try {
+    const res = await fetch("/api/history/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: entry.type,
+        title: entry.title,
+        data: entry.codeData ?? entry.prData,
+      }),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { id: string | null };
+    return json.id;
+  } catch {
+    return null;
+  }
+}
+
+export async function getSharedReview(id: string): Promise<HistoryEntry | null> {
+  try {
+    const res = await fetch(`/api/history/share/${id}`);
+    if (!res.ok) return null;
+    const row = (await res.json()) as {
+      id: string;
+      type: "code" | "pr";
+      title: string;
+      data: Record<string, unknown>;
+      created_at: string;
+    };
+    return {
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      timestamp: new Date(row.created_at).getTime(),
+      ...(row.type === "code"
+        ? { codeData: row.data as HistoryEntry["codeData"] }
+        : { prData: row.data as HistoryEntry["prData"] }),
+    };
+  } catch {
+    return null;
+  }
+}

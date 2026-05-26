@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import {
   saveReview,
   getReviews,
+  getReviewById,
   deleteReview,
   clearReviews,
   isSupabaseConfigured,
@@ -15,6 +16,20 @@ function userId(req: Request): string | undefined {
 
 router.get("/status", (_req: Request, res: Response) => {
   res.json({ configured: isSupabaseConfigured() });
+});
+
+router.post("/share", async (req: Request, res: Response): Promise<void> => {
+  const { type, title, data } = req.body as { type: "code" | "pr"; title: string; data: unknown };
+  if (!type || !title || !data) { res.status(400).json({ error: "type, title, and data required" }); return; }
+  const id = await saveReview({ userId: "shared", type, title, data });
+  if (!id) { res.status(500).json({ error: "Failed to save" }); return; }
+  res.json({ id });
+});
+
+router.get("/share/:id", async (req: Request, res: Response): Promise<void> => {
+  const review = await getReviewById(String(req.params.id));
+  if (!review) { res.status(404).json({ error: "not found" }); return; }
+  res.json(review);
 });
 
 router.get("/", async (req: Request, res: Response): Promise<void> => {

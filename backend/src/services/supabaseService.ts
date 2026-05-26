@@ -71,6 +71,21 @@ export async function deleteReview(id: string, userId: string): Promise<boolean>
   return true;
 }
 
+export async function getReviewById(id: string): Promise<unknown | null> {
+  const client = db();
+  if (!client) return null;
+  const { data, error } = await client
+    .from("reviews")
+    .select("id, type, title, data, created_at")
+    .eq("id", id)
+    .single();
+  if (error) {
+    console.error("[supabase] getReviewById:", error.message);
+    return null;
+  }
+  return data;
+}
+
 export async function clearReviews(userId: string): Promise<boolean> {
   const client = db();
   if (!client) return false;

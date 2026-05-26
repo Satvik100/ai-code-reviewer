@@ -3,12 +3,13 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { Components } from "react-markdown";
 import type { ReviewResult } from "../types";
-import { Bot, Copy, Check } from "lucide-react";
+import { Bot, Copy, Check, Share2, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 interface Props {
   result: ReviewResult;
   isStreaming?: boolean;
+  onShare?: () => Promise<string | null>;
 }
 
 const markdownComponents: Components = {
@@ -70,13 +71,27 @@ const markdownComponents: Components = {
   hr: () => <hr className="border-gray-700 my-4" />,
 };
 
-export function ReviewDisplay({ result, isStreaming = false }: Props) {
+export function ReviewDisplay({ result, isStreaming = false, onShare }: Props) {
   const [copied, setCopied] = useState(false);
+  const [shareState, setShareState] = useState<"idle" | "loading" | "done">("idle");
 
   async function copyReview() {
     await navigator.clipboard.writeText(result.review);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleShare() {
+    if (!onShare) return;
+    setShareState("loading");
+    const id = await onShare();
+    if (id) {
+      await navigator.clipboard.writeText(`${window.location.origin}?share=${id}`);
+      setShareState("done");
+      setTimeout(() => setShareState("idle"), 2000);
+    } else {
+      setShareState("idle");
+    }
   }
 
   return (
@@ -95,13 +110,25 @@ export function ReviewDisplay({ result, isStreaming = false }: Props) {
           )}
         </div>
         {!isStreaming && (
-          <button
-            onClick={copyReview}
-            title="Copy review"
-            className="text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1 text-xs"
-          >
-            {copied ? <><Check size={13} className="text-green-400" /><span className="text-green-400">Copied!</span></> : <><Copy size={13} />Copy</>}
-          </button>
+          <div className="flex items-center gap-3">
+            {onShare && (
+              <button
+                onClick={handleShare}
+                disabled={shareState === "loading"}
+                title="Copy share link"
+                className="text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1 text-xs disabled:opacity-50"
+              >
+                {shareState === "loading" ? <Loader2 size={13} className="animate-spin" /> : shareState === "done" ? <><Check size={13} className="text-green-400" /><span className="text-green-400">Link copied!</span></> : <><Share2 size={13} />Share</>}
+              </button>
+            )}
+            <button
+              onClick={copyReview}
+              title="Copy review"
+              className="text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1 text-xs"
+            >
+              {copied ? <><Check size={13} className="text-green-400" /><span className="text-green-400">Copied!</span></> : <><Copy size={13} />Copy</>}
+            </button>
+          </div>
         )}
       </div>
       <div className="p-6 prose prose-invert max-w-none overflow-auto">
