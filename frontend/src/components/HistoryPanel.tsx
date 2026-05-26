@@ -28,9 +28,10 @@ interface Props {
   signInSlot?: React.ReactNode;
   onDelete: (id: string) => void;
   onClearAll: () => void;
+  onLoad?: (entry: HistoryEntry) => void;
 }
 
-export function HistoryPanel({ history, isCloud, signInSlot, onDelete, onClearAll }: Props) {
+export function HistoryPanel({ history, isCloud, signInSlot, onDelete, onClearAll, onLoad }: Props) {
   if (history.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-gray-500 gap-4">
@@ -79,7 +80,8 @@ export function HistoryPanel({ history, isCloud, signInSlot, onDelete, onClearAl
         {history.map((entry) => (
           <div
             key={entry.id}
-            className="bg-gray-900 rounded-xl border border-gray-800 p-4 hover:border-gray-700 transition-colors"
+            onClick={() => onLoad?.(entry)}
+            className={`bg-gray-900 rounded-xl border border-gray-800 p-4 transition-colors ${onLoad ? "cursor-pointer hover:border-blue-700 hover:bg-gray-800/50" : "hover:border-gray-700"}`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3 flex-1 min-w-0">

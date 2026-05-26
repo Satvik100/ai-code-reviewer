@@ -87,5 +87,12 @@ export function useCodeReview() {
     setError(null);
   }
 
-  return { status, result, streamingText, error, submitReview, reset };
+  function preloadResult(reviewResult: ReviewResult) {
+    setResult(reviewResult);
+    setStatus("success");
+    setStreamingText("");
+    setError(null);
+  }
+
+  return { status, result, streamingText, error, submitReview, reset, preloadResult };
 }

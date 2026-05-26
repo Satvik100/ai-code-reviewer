@@ -15,6 +15,7 @@ import {
   getCloudHistory,
   deleteCloudReview,
   clearCloudHistory,
+  getSharedReview,
 } from "./utils/cloudStorage";
 import type {
   HistoryEntry,
@@ -37,11 +38,32 @@ export default function App({ authSlot, signInSlot, userId = null, isSignedIn = 
     () => (localStorage.getItem("activeTab") as Tab) ?? "code"
   );
 
+  const [preloadedEntry, setPreloadedEntry] = useState<HistoryEntry | null>(null);
+
   function handleTabChange(tab: Tab) {
     setActiveTab(tab);
     localStorage.setItem("activeTab", tab);
   }
+
+  function handleLoadEntry(entry: HistoryEntry) {
+    setPreloadedEntry(entry);
+    handleTabChange(entry.type === "code" ? "code" : "pr");
+  }
+
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get("share");
+    if (shareId) {
+      getSharedReview(shareId).then((entry) => {
+        if (entry) {
+          handleLoadEntry(entry);
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (isSignedIn && userId) {
@@ -185,10 +207,16 @@ export default function App({ authSlot, signInSlot, userId = null, isSignedIn = 
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {activeTab === "code" && (
-          <CodeReviewPanel onSuccess={handleCodeSuccess} />
+          <CodeReviewPanel
+            onSuccess={handleCodeSuccess}
+            preloaded={preloadedEntry?.type === "code" ? preloadedEntry : null}
+          />
         )}
         {activeTab === "pr" && (
-          <PRReviewPanel onSuccess={handlePRSuccess} />
+          <PRReviewPanel
+            onSuccess={handlePRSuccess}
+            preloaded={preloadedEntry?.type === "pr" ? preloadedEntry : null}
+          />
         )}
         {activeTab === "history" && (
           <HistoryPanel
@@ -197,6 +225,7 @@ export default function App({ authSlot, signInSlot, userId = null, isSignedIn = 
             signInSlot={signInSlot}
             onDelete={handleDeleteHistory}
             onClearAll={handleClearHistory}
+            onLoad={handleLoadEntry}
           />
         )}
         {activeTab === "bot" && <BotSetupPanel />}

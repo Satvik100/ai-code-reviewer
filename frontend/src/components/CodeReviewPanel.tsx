@@ -5,23 +5,38 @@ import { LanguageSelector } from "./LanguageSelector";
 import { FocusAreaSelector } from "./FocusAreaSelector";
 import { ReviewDisplay } from "./ReviewDisplay";
 import { useCodeReview } from "../hooks/useCodeReview";
-import type { ReviewResult } from "../types";
+import { shareReview } from "../utils/cloudStorage";
+import type { ReviewResult, HistoryEntry } from "../types";
 
 interface Props {
   onSuccess: (code: string, language: string, result: ReviewResult) => void;
+  preloaded?: HistoryEntry | null;
 }
 
-export function CodeReviewPanel({ onSuccess }: Props) {
+export function CodeReviewPanel({ onSuccess, preloaded }: Props) {
   const [code, setCode] = useState("");
   const [language, setLanguage] = useState("javascript");
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
-  const { status, result, streamingText, error, submitReview, reset } = useCodeReview();
+  const { status, result, streamingText, error, submitReview, reset, preloadResult } = useCodeReview();
 
   useEffect(() => {
     if (status === "success" && result) {
       onSuccess(code, language, result);
     }
   }, [status, result]);
+
+  useEffect(() => {
+    if (preloaded?.codeData) {
+      setCode(preloaded.codeData.code);
+      setLanguage(preloaded.codeData.language);
+      preloadResult(preloaded.codeData.result);
+    }
+  }, [preloaded]);
+
+  async function handleShare() {
+    if (!result) return null;
+    return shareReview({ type: "code", title: `${language} review`, codeData: { code, language, result } });
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -133,7 +148,7 @@ export function CodeReviewPanel({ onSuccess }: Props) {
         />
       )}
 
-      {status === "success" && result && <ReviewDisplay result={result} />}
+      {status === "success" && result && <ReviewDisplay result={result} onShare={handleShare} />}
     </div>
   );
 }

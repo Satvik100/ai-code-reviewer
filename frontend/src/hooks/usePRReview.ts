@@ -48,5 +48,11 @@ export function usePRReview() {
     setError(null);
   }
 
-  return { status, result, error, submitPRReview, reset };
+  function preloadResult(reviewResult: PRReviewResponse) {
+    setResult(reviewResult);
+    setStatus("success");
+    setError(null);
+  }
+
+  return { status, result, error, submitPRReview, reset, preloadResult };
 }
