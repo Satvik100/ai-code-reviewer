@@ -2,7 +2,7 @@
 
 An AI-powered code review tool that analyzes code and pull requests, posts automated review comments via a GitHub App bot, and syncs history across devices — built with Groq, React, Clerk, and Supabase.
 
-**Live demo:** https://ai-code-reviewer-psi-sooty.vercel.app
+**Live demo:** https://ai-code-reviewer-satvik.vercel.app
 
 ---
 
