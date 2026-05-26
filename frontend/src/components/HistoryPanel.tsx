@@ -143,7 +143,7 @@ export function HistoryPanel({ history, isCloud, signInSlot, onDelete, onClearAl
               </div>
 
               <button
-                onClick={() => onDelete(entry.id)}
+                onClick={(e) => { e.stopPropagation(); onDelete(entry.id); }}
                 className="text-gray-600 hover:text-red-400 transition-colors shrink-0"
                 title="Delete"
               >
