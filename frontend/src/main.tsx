@@ -3,13 +3,20 @@ import { createRoot } from "react-dom/client";
 import { ClerkProvider } from "@clerk/clerk-react";
 import "./index.css";
 import App from "./App";
+import { AppWithClerk } from "./AppWithClerk";
 
-const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
+const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
-createRoot(document.getElementById("root")!).render(
+const root = (
   <StrictMode>
-    <ClerkProvider publishableKey={publishableKey ?? ""}>
+    {publishableKey ? (
+      <ClerkProvider publishableKey={publishableKey}>
+        <AppWithClerk />
+      </ClerkProvider>
+    ) : (
       <App />
-    </ClerkProvider>
+    )}
   </StrictMode>
 );
+
+createRoot(document.getElementById("root")!).render(root);

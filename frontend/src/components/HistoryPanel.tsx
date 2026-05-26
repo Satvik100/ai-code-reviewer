@@ -8,9 +8,7 @@ import {
   ShieldAlert,
   AlertTriangle,
   Lightbulb,
-  LogIn,
 } from "lucide-react";
-import { SignInButton } from "@clerk/clerk-react";
 import type { HistoryEntry } from "../types";
 
 function timeAgo(timestamp: number): string {
@@ -27,11 +25,13 @@ function timeAgo(timestamp: number): string {
 interface Props {
   history: HistoryEntry[];
   isCloud: boolean;
+  signInSlot?: React.ReactNode;
   onDelete: (id: string) => void;
   onClearAll: () => void;
+  onLoad?: (entry: HistoryEntry) => void;
 }
 
-export function HistoryPanel({ history, isCloud, onDelete, onClearAll }: Props) {
+export function HistoryPanel({ history, isCloud, signInSlot, onDelete, onClearAll, onLoad }: Props) {
   if (history.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-gray-500 gap-4">
@@ -42,14 +42,7 @@ export function HistoryPanel({ history, isCloud, onDelete, onClearAll }: Props) 
             Reviews you run will appear here
           </p>
         </div>
-        {!isCloud && (
-          <SignInButton mode="modal">
-            <button className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 border border-blue-900 hover:border-blue-700 px-3 py-1.5 rounded-lg transition-colors">
-              <LogIn size={13} />
-              Sign in to sync history across devices
-            </button>
-          </SignInButton>
-        )}
+        {!isCloud && signInSlot}
       </div>
     );
   }
@@ -65,12 +58,14 @@ export function HistoryPanel({ history, isCloud, onDelete, onClearAll }: Props) 
             <span className="flex items-center gap-1 text-xs text-green-500">
               <Cloud size={11} /> synced
             </span>
+          ) : signInSlot ? (
+            <span className="flex items-center gap-1 text-xs text-gray-500">
+              <HardDrive size={11} /> local only — {signInSlot}
+            </span>
           ) : (
-            <SignInButton mode="modal">
-              <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-400 transition-colors">
-                <HardDrive size={11} /> local only — sign in to sync
-              </button>
-            </SignInButton>
+            <span className="flex items-center gap-1 text-xs text-gray-500">
+              <HardDrive size={11} /> local only
+            </span>
           )}
         </div>
         <button
@@ -85,7 +80,8 @@ export function HistoryPanel({ history, isCloud, onDelete, onClearAll }: Props) 
         {history.map((entry) => (
           <div
             key={entry.id}
-            className="bg-gray-900 rounded-xl border border-gray-800 p-4 hover:border-gray-700 transition-colors"
+            onClick={() => onLoad?.(entry)}
+            className={`bg-gray-900 rounded-xl border border-gray-800 p-4 transition-colors ${onLoad ? "cursor-pointer hover:border-blue-700 hover:bg-gray-800/50" : "hover:border-gray-700"}`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3 flex-1 min-w-0">

@@ -1,12 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-  useUser,
-} from "@clerk/clerk-react";
-import { Code2, GitPullRequest, Clock, Bot, LogIn } from "lucide-react";
+import { Code2, GitPullRequest, Clock, Bot } from "lucide-react";
 import { CodeReviewPanel } from "./components/CodeReviewPanel";
 import { PRReviewPanel } from "./components/PRReviewPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
@@ -22,6 +15,7 @@ import {
   getCloudHistory,
   deleteCloudReview,
   clearCloudHistory,
+  getSharedReview,
 } from "./utils/cloudStorage";
 import type {
   HistoryEntry,
@@ -32,21 +26,54 @@ import type {
 
 type Tab = "code" | "pr" | "history" | "bot";
 
-export default function App() {
-  const { user, isSignedIn } = useUser();
-  const [activeTab, setActiveTab] = useState<Tab>("code");
+interface Props {
+  authSlot?: React.ReactNode;
+  signInSlot?: React.ReactNode;
+  userId?: string | null;
+  isSignedIn?: boolean;
+}
+
+export default function App({ authSlot, signInSlot, userId = null, isSignedIn = false }: Props) {
+  const [activeTab, setActiveTab] = useState<Tab>(
+    () => (localStorage.getItem("activeTab") as Tab) ?? "code"
+  );
+
+  const [preloadedEntry, setPreloadedEntry] = useState<HistoryEntry | null>(null);
+
+  function handleTabChange(tab: Tab) {
+    setActiveTab(tab);
+    localStorage.setItem("activeTab", tab);
+  }
+
+  function handleLoadEntry(entry: HistoryEntry) {
+    setPreloadedEntry(entry);
+    handleTabChange(entry.type === "code" ? "code" : "pr");
+  }
+
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  // Load history — cloud when signed in, localStorage when not
   useEffect(() => {
-    if (isSignedIn && user) {
-      getCloudHistory(user.id).then((entries) => {
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get("share");
+    if (shareId) {
+      getSharedReview(shareId).then((entry) => {
+        if (entry) {
+          handleLoadEntry(entry);
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isSignedIn && userId) {
+      getCloudHistory(userId).then((entries) => {
         setHistory(entries.length > 0 ? entries : getHistory());
       });
     } else {
       setHistory(getHistory());
     }
-  }, [isSignedIn, user]);
+  }, [isSignedIn, userId]);
 
   async function handleCodeSuccess(
     code: string,
@@ -59,19 +86,16 @@ export default function App() {
       codeData: { code, language, result },
     };
 
-    if (isSignedIn && user) {
-      const cloudId = await saveCloudReview(user.id, entryBase);
+    if (isSignedIn && userId) {
+      const cloudId = await saveCloudReview(userId, entryBase);
       if (cloudId) {
-        const cloudEntry: HistoryEntry = {
-          ...entryBase,
-          id: cloudId,
-          timestamp: Date.now(),
-        };
-        setHistory((prev) => [cloudEntry, ...prev]);
+        setHistory((prev) => [
+          { ...entryBase, id: cloudId, timestamp: Date.now() },
+          ...prev,
+        ]);
         return;
       }
     }
-    // Fallback to localStorage
     const entry = addToHistory(entryBase);
     setHistory((prev) => [entry, ...prev]);
   }
@@ -92,15 +116,13 @@ export default function App() {
       prData: { prUrl, metadata, result },
     };
 
-    if (isSignedIn && user) {
-      const cloudId = await saveCloudReview(user.id, entryBase);
+    if (isSignedIn && userId) {
+      const cloudId = await saveCloudReview(userId, entryBase);
       if (cloudId) {
-        const cloudEntry: HistoryEntry = {
-          ...entryBase,
-          id: cloudId,
-          timestamp: Date.now(),
-        };
-        setHistory((prev) => [cloudEntry, ...prev]);
+        setHistory((prev) => [
+          { ...entryBase, id: cloudId, timestamp: Date.now() },
+          ...prev,
+        ]);
         return;
       }
     }
@@ -109,8 +131,8 @@ export default function App() {
   }
 
   async function handleDeleteHistory(id: string) {
-    if (isSignedIn && user) {
-      await deleteCloudReview(user.id, id);
+    if (isSignedIn && userId) {
+      await deleteCloudReview(userId, id);
     } else {
       removeFromHistory(id);
     }
@@ -118,8 +140,8 @@ export default function App() {
   }
 
   async function handleClearHistory() {
-    if (isSignedIn && user) {
-      await clearCloudHistory(user.id);
+    if (isSignedIn && userId) {
+      await clearCloudHistory(userId);
     } else {
       clearHistory();
     }
@@ -142,7 +164,6 @@ export default function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <header className="border-b border-gray-800 bg-gray-900 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4">
-          {/* Logo row */}
           <div className="flex items-center justify-between pt-4 pb-3">
             <div className="flex items-center gap-3">
               <div className="bg-blue-600 p-1.5 rounded-lg">
@@ -157,33 +178,14 @@ export default function App() {
                 </p>
               </div>
             </div>
-
-            {/* Auth */}
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 px-3 py-1.5 rounded-lg transition-colors">
-                  <LogIn size={15} />
-                  Sign in
-                </button>
-              </SignInButton>
-            </SignedOut>
-            <SignedIn>
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: "w-8 h-8",
-                  },
-                }}
-              />
-            </SignedIn>
+            {authSlot}
           </div>
 
-          {/* Tab bar */}
           <div className="flex gap-1">
             {tabs.map(({ id, label, Icon, badge }) => (
               <button
                 key={id}
-                onClick={() => setActiveTab(id)}
+                onClick={() => handleTabChange(id)}
                 className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
                   activeTab === id
                     ? "border-blue-500 text-white bg-gray-950"
@@ -205,17 +207,25 @@ export default function App() {
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {activeTab === "code" && (
-          <CodeReviewPanel onSuccess={handleCodeSuccess} />
+          <CodeReviewPanel
+            onSuccess={handleCodeSuccess}
+            preloaded={preloadedEntry?.type === "code" ? preloadedEntry : null}
+          />
         )}
         {activeTab === "pr" && (
-          <PRReviewPanel onSuccess={handlePRSuccess} />
+          <PRReviewPanel
+            onSuccess={handlePRSuccess}
+            preloaded={preloadedEntry?.type === "pr" ? preloadedEntry : null}
+          />
         )}
         {activeTab === "history" && (
           <HistoryPanel
             history={history}
-            isCloud={!!(isSignedIn && user)}
+            isCloud={!!(isSignedIn && userId)}
+            signInSlot={signInSlot}
             onDelete={handleDeleteHistory}
             onClearAll={handleClearHistory}
+            onLoad={handleLoadEntry}
           />
         )}
         {activeTab === "bot" && <BotSetupPanel />}

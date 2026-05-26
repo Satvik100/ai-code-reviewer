@@ -5,17 +5,19 @@ import { LanguageSelector } from "./LanguageSelector";
 import { FocusAreaSelector } from "./FocusAreaSelector";
 import { ReviewDisplay } from "./ReviewDisplay";
 import { useCodeReview } from "../hooks/useCodeReview";
-import type { ReviewResult } from "../types";
+import { shareReview } from "../utils/cloudStorage";
+import type { ReviewResult, HistoryEntry } from "../types";
 
 interface Props {
   onSuccess: (code: string, language: string, result: ReviewResult) => void;
+  preloaded?: HistoryEntry | null;
 }
 
-export function CodeReviewPanel({ onSuccess }: Props) {
+export function CodeReviewPanel({ onSuccess, preloaded }: Props) {
   const [code, setCode] = useState("");
   const [language, setLanguage] = useState("javascript");
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
-  const { status, result, streamingText, error, submitReview, reset } = useCodeReview();
+  const { status, result, streamingText, error, submitReview, reset, preloadResult } = useCodeReview();
 
   useEffect(() => {
     if (status === "success" && result) {
@@ -23,9 +25,28 @@ export function CodeReviewPanel({ onSuccess }: Props) {
     }
   }, [status, result]);
 
+  useEffect(() => {
+    if (preloaded?.codeData) {
+      setCode(preloaded.codeData.code);
+      setLanguage(preloaded.codeData.language);
+      preloadResult(preloaded.codeData.result);
+    }
+  }, [preloaded]);
+
+  async function handleShare() {
+    if (!result) return null;
+    return shareReview({ type: "code", title: `${language} review`, codeData: { code, language, result } });
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (code.trim()) {
+      submitReview({ code, language, focusAreas });
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && code.trim() && !isBusy) {
       submitReview({ code, language, focusAreas });
     }
   }
@@ -40,7 +61,7 @@ export function CodeReviewPanel({ onSuccess }: Props) {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
@@ -82,6 +103,7 @@ export function CodeReviewPanel({ onSuccess }: Props) {
               <>
                 <Sparkles size={16} />
                 Review Code
+                <span className="text-xs opacity-50 ml-1">⌘↵</span>
               </>
             )}
           </button>
@@ -126,7 +148,7 @@ export function CodeReviewPanel({ onSuccess }: Props) {
         />
       )}
 
-      {status === "success" && result && <ReviewDisplay result={result} />}
+      {status === "success" && result && <ReviewDisplay result={result} onShare={handleShare} />}
     </div>
   );
 }

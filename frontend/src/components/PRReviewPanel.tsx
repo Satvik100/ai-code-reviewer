@@ -15,12 +15,16 @@ import {
   Plus,
   Minus,
   Sparkles,
+  Share2,
+  Check,
 } from "lucide-react";
 import { usePRReview } from "../hooks/usePRReview";
-import type { PRMetadata, PRReviewResult, PRReviewComment } from "../types";
+import { shareReview } from "../utils/cloudStorage";
+import type { PRMetadata, PRReviewResult, PRReviewComment, HistoryEntry } from "../types";
 
 interface Props {
   onSuccess: (prUrl: string, metadata: PRMetadata, result: PRReviewResult) => void;
+  preloaded?: HistoryEntry | null;
 }
 
 type Severity = PRReviewComment["severity"];
@@ -65,18 +69,40 @@ const SEVERITY_CONFIG: Record<
   },
 };
 
-export function PRReviewPanel({ onSuccess }: Props) {
+export function PRReviewPanel({ onSuccess, preloaded }: Props) {
   const [prUrl, setPrUrl] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
-  const { status, result, error, submitPRReview, reset } = usePRReview();
+  const [shareState, setShareState] = useState<"idle" | "loading" | "done">("idle");
+  const { status, result, error, submitPRReview, reset, preloadResult } = usePRReview();
 
   useEffect(() => {
     if (status === "success" && result) {
       onSuccess(prUrl, result.metadata, result.result);
     }
   }, [status, result]);
+
+  useEffect(() => {
+    if (preloaded?.prData) {
+      setPrUrl(preloaded.prData.prUrl);
+      preloadResult({ metadata: preloaded.prData.metadata, result: preloaded.prData.result });
+    }
+  }, [preloaded]);
+
+  async function handleShare() {
+    if (!result) return;
+    setShareState("loading");
+    const title = `PR #${result.metadata.number}: ${result.metadata.title.slice(0, 50)}`;
+    const id = await shareReview({ type: "pr", title, prData: { prUrl, metadata: result.metadata, result: result.result } });
+    if (id) {
+      await navigator.clipboard.writeText(`${window.location.origin}?share=${id}`);
+      setShareState("done");
+      setTimeout(() => setShareState("idle"), 2000);
+    } else {
+      setShareState("idle");
+    }
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -108,6 +134,7 @@ export function PRReviewPanel({ onSuccess }: Props) {
   }
 
   const isLoading = status === "loading";
+  const isValidUrl = /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(prUrl.trim());
 
   return (
     <div className="space-y-6">
@@ -136,8 +163,13 @@ export function PRReviewPanel({ onSuccess }: Props) {
                 onChange={(e) => setPrUrl(e.target.value)}
                 placeholder="https://github.com/owner/repo/pull/123"
                 disabled={isLoading}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className={`w-full bg-gray-800 border rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none disabled:opacity-50 ${
+                  prUrl && !isValidUrl ? "border-red-600 focus:border-red-500" : "border-gray-700 focus:border-blue-500"
+                }`}
               />
+              {prUrl && !isValidUrl && (
+                <p className="text-xs text-red-400 mt-1">Enter a valid GitHub PR URL: github.com/owner/repo/pull/123</p>
+              )}
             </div>
           </div>
 
@@ -170,7 +202,7 @@ export function PRReviewPanel({ onSuccess }: Props) {
         <div className="flex gap-3">
           <button
             type="submit"
-            disabled={isLoading || !prUrl.trim()}
+            disabled={isLoading || !isValidUrl}
             className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
           >
             {isLoading ? (
@@ -241,14 +273,23 @@ export function PRReviewPanel({ onSuccess }: Props) {
                 </h3>
                 <p className="text-xs text-gray-400 mt-1">by {result.metadata.author}</p>
               </div>
-              <a
-                href={result.metadata.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 shrink-0"
-              >
-                Open <ExternalLink size={12} />
-              </a>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={handleShare}
+                  disabled={shareState === "loading"}
+                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-50"
+                >
+                  {shareState === "loading" ? <Loader2 size={12} className="animate-spin" /> : shareState === "done" ? <><Check size={12} className="text-green-400" /><span className="text-green-400">Link copied!</span></> : <><Share2 size={12} />Share</>}
+                </button>
+                <a
+                  href={result.metadata.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+                >
+                  Open <ExternalLink size={12} />
+                </a>
+              </div>
             </div>
 
             <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-800">

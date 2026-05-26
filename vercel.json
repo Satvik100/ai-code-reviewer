@@ -16,6 +16,6 @@
     { "src": "/api/(.*)", "dest": "/api/index.ts" },
     { "src": "/review(.*)", "dest": "/api/index.ts" },
     { "src": "/webhooks(.*)", "dest": "/api/index.ts" },
-    { "src": "/(.*)", "dest": "/frontend/dist/$1" }
+    { "src": "/(.*)", "dest": "/frontend/$1" }
   ]
 }

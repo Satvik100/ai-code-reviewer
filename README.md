@@ -1,36 +1,68 @@
 # AI Code Reviewer
 
-An AI-powered code review tool that analyzes your code and provides detailed, actionable feedback using **Groq's Llama 3.3** model — free, fast, and no credit card required.
+An AI-powered code review tool that analyzes code and pull requests, posts automated review comments via a GitHub App bot, and syncs history across devices — built with Groq, React, Clerk, and Supabase.
+
+**Live demo:** https://ai-code-reviewer-psi-sooty.vercel.app
+
+---
 
 ## Features
 
-- **Multi-language support** — JavaScript, TypeScript, Python, Java, C#, Go, Rust, and 9 more
-- **Deep analysis** — catches bugs, security issues, performance problems, and bad practices
-- **Focus areas** — target specific concerns like Security, Performance, or Error Handling
-- **Syntax highlighting** — beautifully rendered review with code examples
-- **Instant feedback** — powered by Groq's ultra-fast inference
+### Code Review
+Paste any code snippet and get a detailed AI review in seconds — bugs, security issues, performance problems, and improvement suggestions with code examples.
+
+### PR Review
+Enter a GitHub pull request URL and get a full review of every changed file — critical issues, warnings, and suggestions with per-file breakdowns and stats.
+
+### GitHub App Bot
+Install the GitHub App on any repository and it automatically posts AI review comments on every pull request — no manual steps needed.
+
+### Cloud History
+Sign in with Google or GitHub (via Clerk) to sync your review history across devices. Anonymous users fall back to localStorage automatically.
+
+---
 
 ## Tech Stack
 
-**Frontend**
-- React 18 + TypeScript
-- Vite
-- Tailwind CSS
-- React Markdown + Syntax Highlighter
+| Layer | Tech |
+|---|---|
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS |
+| AI | Groq SDK — Llama 3.3 70B |
+| Auth | Clerk (Google + GitHub OAuth) |
+| Database | Supabase (PostgreSQL) |
+| Backend | Express.js on Vercel Serverless |
+| GitHub Bot | GitHub App — JWT auth, HMAC webhook verification |
+| Deployment | Vercel |
 
-**Backend / API**
-- Vercel Serverless Functions
-- Groq SDK (Llama 3.3 70B)
+---
 
-## Getting Started
+## Architecture
+
+```
+Browser
+  ├── Code/PR review  →  POST /api/review  →  Groq (Llama 3.3 70B)
+  ├── History (auth)  →  GET/POST /api/history  →  Supabase
+  └── History (anon)  →  localStorage
+
+GitHub
+  └── PR opened/updated  →  POST /webhooks/github  →  GitHub App bot
+        └── Fetches PR diff  →  Groq review  →  posts comment on PR
+```
+
+---
+
+## Local Development
 
 ### Prerequisites
 - Node.js 18+
-- A free [Groq API key](https://console.groq.com)
+- [Groq API key](https://console.groq.com) (free)
+- Supabase project (free tier works)
+- Clerk account (free tier works)
+- GitHub App (optional — only needed for the bot)
 
-### Local Development
+### Setup
 
-1. **Clone the repo**
+1. **Clone**
    ```bash
    git clone https://github.com/Satvik100/ai-code-reviewer.git
    cd ai-code-reviewer
@@ -39,46 +71,76 @@ An AI-powered code review tool that analyzes your code and provides detailed, ac
 2. **Install dependencies**
    ```bash
    npm install
-   cd frontend && npm install
-   cd ../backend && npm install
+   cd frontend && npm install && cd ..
+   cd backend && npm install && cd ..
    ```
 
-3. **Set up environment variables**
-   ```bash
-   cp backend/.env.example backend/.env
+3. **Backend env** — create `backend/.env`:
    ```
-   Add your Groq API key to `backend/.env`:
-   ```
-   GROQ_API_KEY=your_groq_api_key_here
+   GROQ_API_KEY=your_groq_api_key
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   GITHUB_APP_ID=your_app_id
+   GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+   GITHUB_WEBHOOK_SECRET=your_webhook_secret
    PORT=3001
    ```
 
-4. **Start the backend**
-   ```bash
-   cd backend && npm run dev
+4. **Frontend env** — create `frontend/.env`:
+   ```
+   VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
    ```
 
-5. **Start the frontend** (new terminal)
+5. **Create Supabase table**
+   ```sql
+   create table reviews (
+     id uuid default gen_random_uuid() primary key,
+     user_id text not null,
+     type text not null,
+     title text not null,
+     data jsonb not null,
+     created_at timestamptz default now() not null
+   );
+   create index on reviews(user_id, created_at desc);
+   ```
+
+6. **Run**
    ```bash
+   # Terminal 1 — backend
+   cd backend && npm run dev
+
+   # Terminal 2 — frontend
    cd frontend && npm run dev
    ```
 
-6. Open [http://localhost:5173](http://localhost:5173)
+   Open http://localhost:5173
 
-## Deployment (Vercel)
+---
 
-1. Push the repo to GitHub
-2. Import the project on [vercel.com](https://vercel.com)
-3. Add environment variable: `GROQ_API_KEY`
-4. Click Deploy — `vercel.json` handles the rest
+## Deploying to Vercel
 
-## Usage
+1. Push to GitHub and import on [vercel.com](https://vercel.com)
+2. Add environment variables in project settings:
+   - `GROQ_API_KEY`
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `VITE_CLERK_PUBLISHABLE_KEY`
+   - `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`
+3. Deploy — `vercel.json` handles routing automatically
 
-1. Paste your code into the editor
-2. Select the programming language
-3. Optionally select focus areas (Security, Performance, etc.)
-4. Click **Review Code**
-5. Read the detailed AI-generated review
+---
+
+## GitHub App Bot Setup
+
+1. Go to GitHub → Settings → Developer settings → GitHub Apps → New GitHub App
+2. Set webhook URL to `https://your-deployment.vercel.app/webhooks/github`
+3. Permissions: Pull requests (Read & Write), Contents (Read)
+4. Subscribe to event: Pull request
+5. Generate a private key and note the App ID
+6. Add `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` to Vercel env vars
+7. Install the app on any repo — it will automatically review every PR
+
+---
 
 ## License
 

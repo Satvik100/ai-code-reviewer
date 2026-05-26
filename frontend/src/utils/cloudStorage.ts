@@ -29,9 +29,12 @@ export async function saveCloudReview(
 export async function getCloudHistory(userId: string): Promise<HistoryEntry[]> {
   try {
     const res = await fetch("/api/history", { headers: { "x-user-id": userId } });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error("[cloudStorage] getCloudHistory failed:", res.status, res.statusText);
+      return [];
+    }
     const json = (await res.json()) as {
-      reviews: Array<{
+      reviews?: Array<{
         id: string;
         type: "code" | "pr";
         title: string;
@@ -39,6 +42,7 @@ export async function getCloudHistory(userId: string): Promise<HistoryEntry[]> {
         created_at: string;
       }>;
     };
+    if (!json.reviews) return [];
     return json.reviews.map((row) => ({
       id: row.id,
       type: row.type,
@@ -48,7 +52,8 @@ export async function getCloudHistory(userId: string): Promise<HistoryEntry[]> {
         ? { codeData: row.data as HistoryEntry["codeData"] }
         : { prData: row.data as HistoryEntry["prData"] }),
     }));
-  } catch {
+  } catch (err) {
+    console.error("[cloudStorage] getCloudHistory:", err);
     return [];
   }
 }
@@ -72,5 +77,51 @@ export async function clearCloudHistory(userId: string): Promise<void> {
     });
   } catch {
     // best-effort
+  }
+}
+
+export async function shareReview(
+  entry: Omit<HistoryEntry, "id" | "timestamp">
+): Promise<string | null> {
+  try {
+    const res = await fetch("/api/history/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: entry.type,
+        title: entry.title,
+        data: entry.codeData ?? entry.prData,
+      }),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { id: string | null };
+    return json.id;
+  } catch {
+    return null;
+  }
+}
+
+export async function getSharedReview(id: string): Promise<HistoryEntry | null> {
+  try {
+    const res = await fetch(`/api/history/share/${id}`);
+    if (!res.ok) return null;
+    const row = (await res.json()) as {
+      id: string;
+      type: "code" | "pr";
+      title: string;
+      data: Record<string, unknown>;
+      created_at: string;
+    };
+    return {
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      timestamp: new Date(row.created_at).getTime(),
+      ...(row.type === "code"
+        ? { codeData: row.data as HistoryEntry["codeData"] }
+        : { prData: row.data as HistoryEntry["prData"] }),
+    };
+  } catch {
+    return null;
   }
 }
