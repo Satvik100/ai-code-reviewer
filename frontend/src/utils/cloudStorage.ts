@@ -29,9 +29,12 @@ export async function saveCloudReview(
 export async function getCloudHistory(userId: string): Promise<HistoryEntry[]> {
   try {
     const res = await fetch("/api/history", { headers: { "x-user-id": userId } });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error("[cloudStorage] getCloudHistory failed:", res.status, res.statusText);
+      return [];
+    }
     const json = (await res.json()) as {
-      reviews: Array<{
+      reviews?: Array<{
         id: string;
         type: "code" | "pr";
         title: string;
@@ -39,6 +42,7 @@ export async function getCloudHistory(userId: string): Promise<HistoryEntry[]> {
         created_at: string;
       }>;
     };
+    if (!json.reviews) return [];
     return json.reviews.map((row) => ({
       id: row.id,
       type: row.type,
@@ -48,7 +52,8 @@ export async function getCloudHistory(userId: string): Promise<HistoryEntry[]> {
         ? { codeData: row.data as HistoryEntry["codeData"] }
         : { prData: row.data as HistoryEntry["prData"] }),
     }));
-  } catch {
+  } catch (err) {
+    console.error("[cloudStorage] getCloudHistory:", err);
     return [];
   }
 }
