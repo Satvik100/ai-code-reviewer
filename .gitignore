@@ -1,7 +1,30 @@
+# Dependencies
 node_modules/
+.venv/
+venv/
+
+# Build output
 dist/
+build/
+frontend/dist/
+*.tsbuildinfo
+coverage/
+
+# Environment and secrets
 .env
-.env.local
+.env.*
+!.env.example
 *.local
-frontend/dist
-.vercel
+*.pem
+*.key
+
+# Deployment
+.vercel/
+
+# Logs and OS / editor files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
